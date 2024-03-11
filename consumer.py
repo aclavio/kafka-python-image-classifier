@@ -4,11 +4,15 @@ import sys
 from argparse import ArgumentParser, FileType
 from configparser import ConfigParser
 from confluent_kafka import Consumer, OFFSET_BEGINNING
+from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka.schema_registry.json_schema import JSONDeserializer
+from imagery import Imagery, imagery_schema_str, dict_to_imagery
 
 if __name__ == '__main__':
     # Parse the command line.
     parser = ArgumentParser()
     parser.add_argument('config_file', type=FileType('r'))
+    parser.add_argument('--in', dest='input_topic', required=True)
     parser.add_argument('--reset', action='store_true')
     args = parser.parse_args()
 
@@ -22,6 +26,9 @@ if __name__ == '__main__':
     # Create Consumer instance
     consumer = Consumer(config)
 
+    # Create deserializers
+    json_deserializer = JSONDeserializer(imagery_schema_str, from_dict=dict_to_imagery)
+
     # Set up a callback to handle the '--reset' flag.
     def reset_offset(consumer, partitions):
         if args.reset:
@@ -30,7 +37,7 @@ if __name__ == '__main__':
             consumer.assign(partitions)
 
     # Subscribe to topic
-    topic = "test-topic"
+    topic = args.input_topic
     consumer.subscribe([topic], on_assign=reset_offset)
 
     # Poll for new messages from Kafka and print them.
@@ -46,9 +53,12 @@ if __name__ == '__main__':
                 print("ERROR: %s".format(msg.error()))
             else:
                 # Extract the (optional) key and value, and print.
-
                 print("Consumed event from topic {topic}[{offset}]: key = {key:12} value = {value:12}".format(
                     topic=msg.topic(), offset=msg.offset(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+                
+                imagery = json_deserializer(msg.value(), SerializationContext(msg.topic, MessageField.VALUE))
+                print("Got Imagery: {}", imagery.title)
+
     except KeyboardInterrupt:
         pass
     finally:
