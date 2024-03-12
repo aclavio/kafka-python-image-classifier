@@ -55,6 +55,8 @@ class Imagery:
 
     def set_image(self, img_path):
         with open(img_path, "rb") as image_file:
+            self.title = image_file.name
+            self.description = img_path
             self.image_base64 = base64.b64encode(image_file.read()).decode()
 
     def add_classification(self, name, weight):

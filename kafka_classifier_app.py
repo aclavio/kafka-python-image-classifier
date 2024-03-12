@@ -98,7 +98,6 @@ if __name__ == '__main__':
     finally:
         # Leave group and commit final offsets
         consumer.close()
-
-    # Block until the messages are sent.
-    producer.poll(10000)
-    producer.flush()
+        # Block until the messages are sent.
+        producer.poll(1)
+        producer.flush()
