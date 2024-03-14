@@ -1,0 +1,5 @@
+confluent-kafka
+tensorflow
+keras
+pillow
+jsonschema
