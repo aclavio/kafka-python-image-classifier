@@ -25,6 +25,7 @@ if __name__ == '__main__':
     config_parser.read_file(args.config_file)
     config = dict(config_parser['default'])
     sr_config = dict(config_parser['schema_registry'])
+    scan_config = dict(config_parser['image_file_scan'])
     # print(config)
 
     # Create Producer instance
@@ -43,7 +44,18 @@ if __name__ == '__main__':
             print('ERROR: Message failed delivery: {}'.format(err))
         else:
             print("Produced event to topic {topic}: key = {key:12} value = {value:12}".format(
-                topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
+                topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')[:40]))
+            
+    valid_extensions = tuple(scan_config['scan.file.ext'].split(','))
+    def validate_img_file(fname: str, **kwargs) -> bool:
+        fstat = kwargs.get('fstat')
+        if (fname.endswith(valid_extensions)):
+            if (fstat == None):
+                fstat = os.stat(fname)
+            if (fstat.st_size <= int(scan_config['scan.file.maxsize'])):
+                return True
+        print(f"Unsupported File: {fname}")
+        return False
 
     # Create an Imagery object and publish to Kafka
     def publish_imagery(title, path):
@@ -58,12 +70,11 @@ if __name__ == '__main__':
     topic = args.output_topic
     # publish images from the passed directory
     if os.path.isfile(args.path):
-        fname = os.path.basename(args.path)
-        if fname.endswith('.jpg'):
-            publish_imagery(fname, args.path)
+        if validate_img_file(args.path):
+            publish_imagery(args.path, args.path)
     elif os.path.isdir(args.path):
         for entry in os.scandir(args.path):
-            if entry.is_file() and entry.name.endswith('.jpg'):
+            if entry.is_file() and validate_img_file(entry.path, fstat=entry.stat()):
                 publish_imagery(entry.name, entry.path)
     else:
         raise Exception('unsupport path type')    
